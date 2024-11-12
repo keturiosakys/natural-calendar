@@ -1,0 +1,43 @@
+{
+	"name": "natural-calendar",
+	"type": "module",
+	"scripts": {
+		"vite:build": "vite build",
+		"vite:dev": "vite",
+		"worker:dev": "wrangler pages dev dist --proxy 5173",
+		"dev": "pnpm vite:dev & pnpm worker:dev",
+		"deploy": "wrangler pages deploy",
+		"db:generate": "drizzle-kit generate",
+		"db:pull": "drizzle-kit pull",
+		"db:migrate": "drizzle-kit migrate",
+		"db:setup": "npm run db:generate && npm run db:migrate",
+		"db:studio": "drizzle-kit studio",
+		"cf:typegen": "wrangler types",
+		"fiberplane": "fpx"
+	},
+	"dependencies": {
+		"@cloudflare/ai-utils": "^1.0.1",
+		"@supabase/supabase-js": "^2.46.1",
+		"@tanstack/react-query": "^5.59.20",
+		"dotenv": "^16.4.5",
+		"drizzle-orm": "^0.36.1",
+		"hono": "^4.6.9",
+		"postgres": "^3.4.5",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"zod": "^3.23.8"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20241022.0",
+		"@fiberplane/hono-otel": "latest",
+		"@fiberplane/studio": "latest",
+		"@types/react": "^18.3.12",
+		"@types/react-dom": "^18.3.1",
+		"@vitejs/plugin-react": "^4.3.3",
+		"drizzle-kit": "^0.28.0",
+		"typescript": "^5.5.4",
+		"typescript-language-server": "^4.3.3",
+		"vite": "^5.4.10",
+		"wrangler": "^3.83.0"
+	}
+}
