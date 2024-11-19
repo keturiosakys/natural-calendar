@@ -13,7 +13,7 @@ import { calendarEvents } from "./db/schema";
 import { runWithTools, tool } from "@cloudflare/ai-utils";
 import { SYSTEM_PROMPT } from "./prompts";
 import { z } from "zod";
-import { handle } from "hono/cloudflare-pages";
+import { except } from "hono/combine";
 
 type Bindings = {
 	SUPABASE_URL: string;
@@ -33,13 +33,13 @@ const aiEventResponseSchema = z.object({
 	description: z.string().optional(),
 });
 
-const app = new Hono<{
+const api = new Hono<{
 	Bindings: Bindings & Env;
 	Variables: Variables;
-}>();
+}>().basePath("/api");
 
-const routes = app
-	.use("*", async (c, next) => {
+const routes = api
+	.use(async (c, next) => {
 		const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_ANON_KEY);
 		c.set("supabase", supabase);
 
@@ -49,10 +49,20 @@ const routes = app
 
 		await next();
 	})
-	.get("/login", async (c) => {
+	.get("/auth/callback", async (c) => {
+		console.log("callback", c.req.raw)
+		const accessToken = c.req.query("access_token");
+		const refreshToken = c.req.query("refresh_token");
+
+		return c.json({ accessToken, refreshToken });
+	})
+	.get("/auth/login", async (c) => {
 		const supabase = c.get("supabase");
 		const { data, error } = await supabase.auth.signInWithOAuth({
 			provider: "github",
+			options: {
+				redirectTo: `${new URL(c.req.url).origin}/api/auth/callback`,
+			},
 		});
 		if (error) {
 			return c.json({ error: error.message }, 500);
@@ -60,24 +70,26 @@ const routes = app
 
 		return c.redirect(data.url);
 	})
-	.use("*", async (c, next) => {
-		const supabase = c.get("supabase");
-		const token = c.req.header("Authorization")?.replace("Bearer ", "");
+	.use(
+		except("/api/auth/*", async (c, next) => {
+			const supabase = c.get("supabase") as SupabaseClient;
+			const token = c.req.header("Authorization")?.replace("Bearer ", "");
 
-		if (!token) {
-			return c.json({ error: "No token provided" }, 401);
-		}
+			if (!token) {
+				return c.json({ error: "No token provided" }, 401);
+			}
 
-		const { data, error } = await supabase.auth.getUser(token);
+			const { data, error } = await supabase.auth.getUser(token);
 
-		if (error) {
-			return c.json({ error: error.message }, 401);
-		}
+			if (error) {
+				return c.json({ error: error.message, cause: error.cause }, 401);
+			}
 
-		c.set("user", data.user);
+			c.set("user", data.user);
 
-		await next();
-	})
+			await next();
+		}),
+	)
 	.get("/events", async (c) => {
 		const db = c.get("db");
 
@@ -104,7 +116,6 @@ const routes = app
 
 		const response = await runWithTools(
 			ai,
-			// @ts-expect-error for some reason the most recent models are not picked up in types
 			"@cf/meta/llama-3.2-1b-instruct",
 			{
 				messages: [
@@ -216,4 +227,4 @@ const routes = app
 // debugger
 // export const onRequest = handle(instrument(app));
 export type AppType = typeof routes;
-export const onRequest = handle(app);
+export default instrument(api);
